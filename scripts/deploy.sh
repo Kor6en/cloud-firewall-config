@@ -35,7 +35,7 @@ EOF
     sudo -n chmod 700 "$STATE/rollback.sh"
     echo "[4/6] 安排延迟自动回滚（${ROLLBACK_WINDOW}s 后），验证通过后用 confirm 取消"
     # 停掉可能存在的旧回滚定时器
-    sudo -n systemctl list-units --all 2>/dev/null | grep -o 'firewall-rollback-[0-9]*\.timer' | sort -u | while read -r u; do sudo -n systemctl stop "$u" 2>/dev/null || true; done
+    { sudo -n systemctl list-units --all 2>/dev/null | grep -o 'firewall-rollback-[0-9]*\.timer' || true; } | sort -u | while read -r u; do [ -n "$u" ] && sudo -n systemctl stop "$u" 2>/dev/null || true; done
     TS=$(date +%Y%m%d%H%M%S)
     UNIT="firewall-rollback-${TS}"
     sudo -n systemd-run --on-active="${ROLLBACK_WINDOW}s" --unit="$UNIT" --description="firewall auto-rollback" /usr/bin/env bash "$STATE/rollback.sh"
