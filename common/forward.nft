@@ -1,0 +1,5 @@
+# common/forward.nft
+# FORWARD 链规则（被 render.sh 内联进 inet host_fw 的 forward 链）
+# 六台均为 Docker 主机，policy=accept，容器转发过滤交给 Docker 自己在 iptables DOCKER-USER 链管理
+# 本链不做额外 DROP，避免与 Docker/Tailscale 的转发规则冲突
+# 若某台升级为 subnet router / exit node，再在此追加明确转发规则

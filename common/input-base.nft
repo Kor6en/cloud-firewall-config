@@ -1,0 +1,10 @@
+# common/input-base.nft
+# INPUT 链通用打底规则（被 render.sh 内联进 inet host_fw 的 input 链）
+# 顺序原则：通用放行在前，主机专属端口在后，默认 drop 由 chain policy 处理
+# 已建立/相关连接放行（SSH 会话、出站回包都靠这条，最关键）
+ct state established,related accept
+# 回环接口
+iif lo accept
+# ICMP / ICMPv6（ping、PMTU 发现必需，不能丢）
+ip protocol icmp accept
+ip6 nexthdr icmpv6 accept
