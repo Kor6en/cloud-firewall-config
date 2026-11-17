@@ -52,7 +52,13 @@ EOF
   confirm)
     U=$(sudo -n cat "$STATE/pending.timer" 2>/dev/null || true)
     if [ -n "$U" ]; then
-      sudo -n systemctl stop "$U" 2>/dev/null && echo "已取消回滚定时器: $U"
+      sudo -n systemctl stop "$U" 2>/dev/null || true
+      sudo -n systemctl reset-failed "$U" 2>/dev/null || true
+      # 兜底：再按 description 匹配停一次（防止 unit 名带/不带 .timer 后缀差异）
+      sudo -n systemctl list-units --all 2>/dev/null | grep -o 'firewall-rollback-[0-9]*\.timer' | sort -u | while read -r t; do
+        [ -n "$t" ] && sudo -n systemctl stop "$t" 2>/dev/null || true
+      done
+      echo "已取消回滚定时器: $U"
       sudo -n rm -f "$STATE/pending.timer"
     else
       echo "无待确认的回滚定时器"
