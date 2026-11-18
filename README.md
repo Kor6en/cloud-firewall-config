@@ -11,7 +11,8 @@
 2. **默认策略**：INPUT drop、FORWARD accept（Docker 主机，转发交给 Docker）、OUTPUT accept（Tailscale 出站全覆盖）。
 3. **公开仓库不含公网 IP**：规则只按端口放行，不含任何具体公网 IP 或内网拓扑。SSH 来源白名单如需添加，见"常见问题"。
 4. **IPv4/IPv6 统一**：用 `inet` 表，一套规则同时覆盖。
-5. **延迟自动回滚**：部署后 30 分钟内必须用另一个 SSH 会话验证并 `confirm`，否则自动回滚，防止把自己锁在门外。
+5. **适配动态 IP**：`INPUT drop` 只决定"开哪些端口"，与公网 IP 是否固定无关。本配置**不写来源 IP 白名单**，SSH 靠密钥认证 + fail2ban 防护——家庭宽带重启换 IP 也不会被锁在外面。切勿为动态 IP 添加 `ip saddr` 来源白名单。
+6. **延迟自动回滚**：部署后 30 分钟内必须用另一个 SSH 会话验证并 `confirm`，否则自动回滚，防止把自己锁在门外。
 
 ## 目录结构
 
@@ -59,7 +60,11 @@ udp dport 5353 accept
 udp dport 60000-61000 accept
 tcp dport 8000-8100 accept
 
-# 只让某来源访问（SSH 来源白名单，公网 IP 固定时推荐）
+# 只让某来源访问（SSH 来源白名单）
+# ⚠️ 仅适用于"公网 IP 固定"的场景。家庭宽带/动态 IP 不要用！
+#   写死 ip saddr 后，一旦 IP 变化就会把自己锁在门外。
+#   当前配置刻意不写来源 IP，SSH 对任意来源开放，靠"密钥认证 + fail2ban"防护，
+#   这正是动态 IP 的正确做法。除非你确认有静态 IP，否则请保留现状。
 ip saddr 203.0.113.7 tcp dport 22 accept
 ip saddr 203.0.113.0/24 tcp dport 22 accept
 
