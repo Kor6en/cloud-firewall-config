@@ -15,3 +15,9 @@ tcp dport 80 accept
 tcp dport 443 accept
 # samba 文件共享
 tcp dport 445 accept
+
+# ---- 远程接入 UDP 端口（历史任务确认）----
+# mosh：默认端口范围 60000-61000（本机 mosh-server 实测监听 60000/60001）
+udp dport 60000-61000 accept
+# tsshd（rootshell Roam-tssh）：端口范围 61001-61020，绑 tailscale0
+udp dport 61001-61020 accept

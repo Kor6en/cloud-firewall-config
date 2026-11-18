@@ -35,48 +35,110 @@ firewall/
 
 ## 端口现状
 
-| 主机 | 公网入站放行 |
+| 主机 | 入站放行 |
 |---|---|
-| osaka-arm（本机） | 22 SSH、80/443 npm、445 samba、UDP 41641 Tailscale 直连；`tailscale0` 接口全放行 |
+| osaka-arm（本机） | 22 SSH、80/443 npm、445 samba；UDP 41641 Tailscale 直连、`tailscale0` 接口全放行；UDP 60000-61000 mosh、UDP 61001-61020 tsshd |
 | ams | 22 SSH、443 sing-box |
 
 其余四台（osaka、osakabeta、amsbeta、amsarm）尚未纳入，按需新增 `hosts/<hostname>.nft` 后部署。
 
-## 常用操作
+## 维护命令速查
+
+所有改动都遵循同一流程：**编辑 hosts 片段 → 校验 → 部署 → 另一会话验证 → 确认 → 提交**。
+
+### 加锁/放端口（改 `hosts/<host>.nft`）
 
 ```bash
-# 1. 改完配置先校验（不改任何规则）
-./scripts/validate.sh ams
+# 放行单个 TCP 端口
+tcp dport 8080 accept
 
-# 2. 部署（30 分钟内需确认，否则自动回滚）
-sudo ./scripts/deploy.sh deploy ams
+# 放行单个 UDP 端口
+udp dport 5353 accept
 
-# 3. 用另一个 SSH 会话验证 SSH / 端口连通性后，取消回滚
+# 放行端口范围（如本机 mosh 60000-61000、tssh 61001-61020）
+udp dport 60000-61000 accept
+tcp dport 8000-8100 accept
+
+# 只让某来源访问（SSH 来源白名单，公网 IP 固定时推荐）
+ip saddr 203.0.113.7 tcp dport 22 accept
+ip saddr 203.0.113.0/24 tcp dport 22 accept
+
+# 放行某网卡进来的全部流量（如 Tailscale）
+iifname "tailscale0" accept
+
+# 拒绝/丢弃某来源（放在白名单之后、默认策略之前）
+ip saddr 198.51.100.0/24 drop
+```
+
+### 删端口 / 临时封端口
+
+```bash
+# 删除某条规则：直接编辑 hosts/<host>.nft 删掉对应行，再部署
+# （配置即真相，不在运行时手删——手删会被下次部署覆盖）
+
+# 临时封禁某 IP（不进 git，立即生效，重启失效；fail2ban 也用类似机制）
+sudo nft add rule inet host_fw input ip saddr 198.51.100.99 drop
+# 解封：记下 handle 再删
+sudo nft -a list table inet host_fw | grep 198.51.100.99
+sudo nft delete rule inet host_fw input handle <HANDLE>
+```
+
+### 校验 / 部署 / 回滚
+
+```bash
+# 校验语法（不改任何规则）
+./scripts/validate.sh <host>
+
+# 部署（30 分钟内必须 confirm，否则自动回滚）
+sudo ./scripts/deploy.sh deploy <host>
+
+# 另一 SSH 会话验证通过后，取消回滚
 sudo ./scripts/deploy.sh confirm
 
-# 立即回滚（删掉 inet host_fw，回到部署前）
+# 立即回滚（删掉 inet host_fw，回到部署前状态）
 sudo ./scripts/deploy.sh rollback
 
 # 查看待执行的回滚定时器
 sudo ./scripts/deploy.sh timer
-
-# 只读审计当前状态
-./scripts/audit.sh
 ```
 
-## 如何新增/修改端口
+### 查询 / 审计
 
-1. 编辑对应 `hosts/<host>.nft`，按注释格式追加一行，例如放行 8080：
-   ```
-   tcp dport 8080 accept
-   ```
-   来源限制（可选），例如只允许某网段访问 22：
-   ```
-   ip saddr 203.0.113.0/24 tcp dport 22 accept
-   ```
-2. `./scripts/validate.sh <host>` 校验。
-3. `sudo ./scripts/deploy.sh deploy <host>` 部署 → 另一会话验证 → `confirm`。
-4. `git add && git commit && git push` 记录变更。
+```bash
+# 只读审计（规则集、服务状态、暴露端口、fail2ban 状态）
+./scripts/audit.sh
+
+# 看当前 host_fw 全部规则
+sudo nft list table inet host_fw
+
+# 看某端口是否已放行（在输出里 grep）
+sudo nft list table inet host_fw | grep 'dport 443'
+
+# 看规则是否命中（给规则加 counter 后观察计数；默认规则无 counter）
+sudo nft list table inet host_fw -a
+```
+
+### 新增一台主机
+
+```bash
+# 1. 复制模板
+cp hosts/ams.nft hosts/<newhost>.nft
+# 2. 编辑放行端口（参考上面语法）
+# 3. 校验 + 部署 + 确认
+./scripts/validate.sh <newhost>
+sudo ./scripts/deploy.sh deploy <newhost>
+# 另一会话验证 → confirm
+# 4. 提交
+git add && git commit && git push
+```
+
+### 提交变更
+
+```bash
+git add -A
+git commit -m "说明改了什么端口/哪台主机"
+git push
+```
 
 ## 关于 Tailscale 端口（已查证官方文档）
 
@@ -87,6 +149,15 @@ Tailscale 流量绝大多数是**出站**，OUTPUT accept 已全部覆盖，无�
 - UDP 41641（WireGuard 直连的源端口）
 
 入站只需一个**可选**端口：**UDP 41641**——放行它可提升 P2P 直连概率、减少走 DERP 中继，不放行也能连（只是慢）。本机已放行。
+
+### 远程接入端口（本机实测）
+
+| 端口 | 协议 | 用途 | 绑定地址 |
+|---|---|---|---|
+| 60000-61000 | UDP | mosh（本机 mosh-server 实测监听 60000/60001） | 10.0.0.24 私网 |
+| 61001-61020 | UDP | tsshd（rootshell Roam-tssh） | tailscale0 (100.85.129.58) |
+
+这两个范围按你的要求已在 hosts/osaka-arm.nft 放行。注意：mosh/tsshd 实际绑在内网/tailnet 地址、不绑 0.0.0.0，公网本就不可达；放行是为确保 tailnet 内和内网路径畅通。如后续不再用 mosh/tssh，删掉这两行重新部署即可。
 
 参考：Tailscale 官方 KB 1082《What firewall ports should I open to use Tailscale?》。
 
