@@ -1,0 +1,13 @@
+# hosts/ams.nft
+# osaka 专属入站放行规则
+# 公网放行端口：22 SSH / 443 sing-box 代理
+# 本机无 Tailscale，故无 tailscale0 / UDP41641 规则
+
+# SSH（公网来源暂不限制，由 fail2ban 保护）
+tcp dport 22 accept
+# sing-box VLESS+REALITY 入口
+tcp dport 443 accept
+
+# 其余端口按需在此文件追加，例如：
+#   tcp dport 8080 accept
+# 追加后 git commit + 跑 scripts/deploy.sh <host> 生效
