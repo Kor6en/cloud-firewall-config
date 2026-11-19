@@ -24,7 +24,7 @@ firewall/
 │   └── output.nft           # OUTPUT（accept，Tailscale 出站已覆盖）
 ├── profiles/                # （预留）按角色区分的策略片段
 ├── hosts/                   # 每台主机的专属端口/接口
-│   ├── osaka-arm.nft        # 本机：22/80/443/445 + Tailscale(udp41641)
+│   ├── osaka-arm.nft        # 本机：22/80/443 + Tailscale(udp41641)
 │   └── ams.nft              # ams：22/443
 ├── scripts/
 │   ├── render.sh            # 拼装成自包含 /etc/nftables.conf
@@ -38,7 +38,7 @@ firewall/
 
 | 主机 | 入站放行 |
 |---|---|
-| osaka-arm（本机） | 22 SSH、80/443 npm、445 samba；UDP 41641 Tailscale 直连、`tailscale0` 接口全放行；UDP 60000-61000 mosh、UDP 61001-61020 tsshd |
+| osaka-arm（本机） | 22 SSH、80/443 npm；UDP 41641 Tailscale 直连、`tailscale0` 接口全放行；UDP 60000-61000 mosh、UDP 61001-61020 tsshd |
 | ams | 22 SSH、443 sing-box |
 
 其余四台（osaka、osakabeta、amsbeta、amsarm）尚未纳入，按需新增 `hosts/<hostname>.nft` 后部署。

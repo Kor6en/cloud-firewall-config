@@ -1,6 +1,6 @@
 # hosts/osaka-arm.nft
 # 本机（osaka-arm）专属入站放行规则
-# 公网放行端口：22 SSH / 80+443 npm 容器 / 445 samba / UDP 41641 Tailscale 直连
+# 公网放行端口：22 SSH / 80+443 npm 容器 / UDP 41641 Tailscale 直连
 # 注意：不含任何公网 IP——入站按端口放行；SSH 来源白名单见 README（你可后续追加 ip saddr 限制）
 
 # Tailscale 接口进来的流量全部放行（管理面 + tailnet 内互访）
@@ -13,8 +13,6 @@ tcp dport 22 accept
 # npm 容器（80/443）
 tcp dport 80 accept
 tcp dport 443 accept
-# samba 文件共享
-tcp dport 445 accept
 
 # ---- 远程接入 UDP 端口（历史任务确认）----
 # mosh：默认端口范围 60000-61000（本机 mosh-server 实测监听 60000/60001）
